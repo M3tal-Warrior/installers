@@ -1,0 +1,20 @@
+[Unit]
+Description=CS:Source Gameserver
+After=network.target
+
+[Service]
+Environment=LD_LIBRARY_PATH=CI_INSTALLDIR:CI_INSTALLDIR/bin:${LD_LIBRARY_PATH}
+ExecStartPre=/bin/mkdir -p CI_TMPDIR/downloading
+ExecStartPre=/bin/mkdir -p CI_TMPDIR/shadercache
+ExecStartPre=/bin/mkdir -p CI_TMPDIR/temp
+ExecStart=CI_INSTALLDIR/srcds_linux -game cstrike -console -port 27015 +maxplayers 10 +map cs_havana
+User=CI_USER
+WorkingDirectory=CI_HOME
+
+Restart=always
+StartLimitBurst=3
+StartLimitBurstInterval=30
+
+[Install]
+WantedBy=multi-user.target
+
