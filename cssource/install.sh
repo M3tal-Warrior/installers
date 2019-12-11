@@ -99,7 +99,7 @@ read CI_HOME
 CI_HOME="${CI_HOME:-$CI_HOME_DEFAULT}"
 # Create directory in case it contains nonexisting parents
 mkdir -p "$CI_HOME"
-if ! adduser --system "$CI_USER" --home "$CI_HOME"
+if ! adduser --system "$CI_USER" --home "$CI_HOME" 2>/dev/null
   then
     echo "User could not be created. Continue anyway? (y/N)"
     read RESPONSE
@@ -151,9 +151,9 @@ CI_LOGDIR="${CI_LOGDIR:-$CI_LOGDIR_DEFAULT}"
 mkdir -p "$CI_LOGDIR"
 chown "$CI_USER" "$CI_LOGDIR"
 # Set tempdir
-echo -e "\nChange the temp directory for the service (default: $CI_USER_DEFAULT)"
+echo -e "\nChange the temp directory for the service (default: $CI_TMPDIR_DEFAULT)"
 read CI_TMPDIR
-CI_TMPDIR="${$CI_TMPDIR:-$CI_TMPDIR_DEFAULT}"
+CI_TMPDIR="${CI_TMPDIR:-$CI_TMPDIR_DEFAULT}"
 
 # Tell the user
 echo "Introducing FHS compliance to Steam/CS:S..."
@@ -239,7 +239,7 @@ clear
 echo -e "=== Server Setup ==="
 
 # Get the server config
-if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/servercfg.template -O "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
+if wget -q https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/servercfg.template -O "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
   then
     chmod 644 "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
     # Ask for certain aspects of the server
@@ -301,7 +301,7 @@ while [ -f "/etc/systemd/system/$CI_UNITNAME.service" ]
     fi
   done
 # Download
-if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/systemd_unit.template -O /etc/systemd/system/$CI_UNITNAME.service
+if wget -q https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/systemd_unit.template -O /etc/systemd/system/$CI_UNITNAME.service
   then
     chmod 644 "/etc/systemd/system/$CI_UNITNAME.service"
     # Modify the template
