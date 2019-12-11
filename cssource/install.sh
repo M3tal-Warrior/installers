@@ -8,7 +8,7 @@
 
 
 # ================================= Copyright =================================
-# Version 0.1 (2019-12-03), Copyright (C) 2019
+# Version 0.1.1 (2019-12-11), Copyright (C) 2019
 # Author: Metal_Warrior
 # Coauthors: -
 
@@ -68,14 +68,17 @@ sleep 1
 # Add 32 bit architecture, which is necessary for Steam
 dpkg --add-architecture i386
 
+# Add contrib and non-free to all standard repos
+sed -i 's# main# main contrib non-free#g' /etc/apt/sources.list
+
 # Update and upgrade all packages
 apt-get update -qq && apt-get dselect-upgrade
 
 # Install dependencies
 apt-get install lib32gcc1 libc6-i386 steamcmd
-if [ "$?" = "1" ]
+if [ "$?" != "0" ]
   then
-    echo "these packages are critical - without them there's no install of CS:S!"
+    echo "These packages are critical - without them there's no install of CS:S!"
     exit 1
   else
     # Empty the screen

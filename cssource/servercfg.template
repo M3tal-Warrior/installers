@@ -1,4 +1,4 @@
-//CS:S dedicated server config
+//CS:S dedicated server config for Metal_Warriors installer
  
 sv_lan 0                    // 1=LAN only 0=Internet
 sv_region 3                 // Region Servers. 0=US East coast, 1=US West coast, 2=South America, 3=Europe, 4=Asia, 5=Australia, 6=Middle East, 7=Africa, 255=World
