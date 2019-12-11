@@ -61,6 +61,10 @@ if [ "$(whoami)" != "root" ]
     exit 1
 fi
 
+# Tell the user what we're doing
+echo "Update the system and install dependencies..."
+sleep 1
+
 # Add 32 bit architecture, which is necessary for Steam
 dpkg --add-architecture i386
 
@@ -73,6 +77,9 @@ if [ "$?" = "1" ]
   then
     echo "these packages are critical - without them there's no install of CS:S!"
     exit 1
+  else
+    # Empty the screen
+    clear
 fi
 
 
@@ -82,12 +89,12 @@ fi
 echo -e "You can change all defaults to your desire, but they're compliant with FHS and\nthus I don't advise to do so without pressing reasons.\nSimple pressing ENTER will use the defaults.\n"
 
 # Create user
-echo "Change the username of the server host (default: $CI_USER_DEFAULT)"
+echo -e "\nChange the username of the server host (default: $CI_USER_DEFAULT)"
 read CI_USER
 CI_USER="${CI_USER:-$CI_USER_DEFAULT}"
 # Reset all variables to reflect the users name
 ci_setvars
-echo "Change the users writable directory (default: $CI_HOME_DEFAULT)"
+echo -e "\nChange the users writable directory (default: $CI_HOME_DEFAULT)"
 read CI_HOME
 CI_HOME="${CI_HOME:-$CI_HOME_DEFAULT}"
 # Create directory in case it contains nonexisting parents
@@ -104,7 +111,7 @@ if ! adduser --system "$CI_USER" --home "$CI_HOME"
 fi
 
 # Create install dir
-echo "Change the install directory (default: $CI_INSTALLDIR_DEFAULT)"
+echo -e "\nChange the install directory (default: $CI_INSTALLDIR_DEFAULT)"
 read CI_INSTALLDIR
 CI_INSTALLDIR=${CI_INSTALLDIR:-$CI_INSTALLDIR_DEFAULT}
 # Create directory in case it contains nonexisting parents
@@ -113,11 +120,18 @@ mkdir -p "$CI_INSTALLDIR"
 # Reset HOME to push .steam to the home directory of the user
 HOME="$CI_HOME"
 # Get CS:S
+echo "Downloading CS:S..."
+sleep 1
 if ! /usr/games/steamcmd +login anonymous +force_install_dir "$CI_INSTALLDIR" +app_update 232330 validate +quit
   then
     echo "Steamcmd exited with code $? - we abort here!"
     exit 1
+  else
+    clear
 fi
+
+# Tell the user
+echo "Correcting wrong permissions..."
 
 # Correct all file modes
 find "$CI_HOME" -type f -exec chmod a-x {} \;
@@ -130,17 +144,19 @@ chmod a+x "$CI_INSTALLDIR/srcds_linux"
 chmod a+x "$CI_INSTALLDIR/srcds_run"
 chmod a+x "$CI_INSTALLDIR/bin/vpk_linux32"
 
-
 # Set logdir
-echo "Change the log directory for the service (default: $CI_LOGDIR_DEFAULT)"
+echo -e "\nChange the log directory for the service (default: $CI_LOGDIR_DEFAULT)"
 read CI_LOGDIR
 CI_LOGDIR="${CI_LOGDIR:-$CI_LOGDIR_DEFAULT}"
 mkdir -p "$CI_LOGDIR"
 chown "$CI_USER" "$CI_LOGDIR"
 # Set tempdir
-echo "Change the temp directory for the service (default: $CI_USER_DEFAULT)"
+echo -e "\nChange the temp directory for the service (default: $CI_USER_DEFAULT)"
 read CI_TMPDIR
 CI_TMPDIR="${$CI_TMPDIR:-$CI_TMPDIR_DEFAULT}"
+
+# Tell the user
+echo "Introducing FHS compliance to Steam/CS:S..."
 
 # Link files/directories to *NIX standard directories
 # steam_appid.txt -> $HOME/
@@ -218,29 +234,33 @@ mkdir -p "$CI_INSTALLDIR/maps"
 # of files as root there
 chown -R "$CI_USER" "$CI_HOME"
 
+# Tell the user
+clear
+echo -e "=== Server Setup ==="
+
 # Get the server config
 if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/servercfg.template -O "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
   then
     chmod 644 "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
     # Ask for certain aspects of the server
-    echo "Provide the name your gameserver will display in CS:S"
+    echo -e "\nProvide the name your gameserver will display in CS:S"
     read CI_SERVERNAME
     # Login password
     CI_LOGINPASSWD="$RANDOM$RANDOM$RANDOM$RANDOM"
     while [ "$CI_LOGINPASSWD" != "$CI_RETRY" ]
       do
-        echo "Gameserver login password? (leave empty to allow everyone)"
+        echo -e "\nGameserver login password? (leave empty to allow everyone)"
         read -s CI_LOGINPASSWD
-        echo "Confirm password"
+        echo -e "\nConfirm password"
         read -s CI_RETRY
       done
     # Admin password
     CI_ADMINPASSWD="$RANDOM$RANDOM$RANDOM$RANDOM"
     while [ "$CI_ADMINPASSWD" != "$CI_RETRY" ]
       do
-        echo "Gameserver admin password? (do NOT leave empty!)"
+        echo -e "\n\nGameserver admin password? (do NOT leave empty!)"
         read -s CI_ADMINPASSWD
-        echo "Confirm password"
+        echo -e "\nConfirm password"
         read -s CI_RETRY
         # Prevent an empty password here
         if [ "$CI_RETRY" = "" ]
@@ -253,7 +273,7 @@ if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssour
     sed -i "s#CI_LOGINPASSWD#$CI_LOGINPASSWD#" "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
     sed -i "s#CI_ADMINPASSWD#$CI_ADMINPASSWD#" "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
     # Ask if there's a wish to edit the file
-    echo -e "It is advised to edit the config personally for further options.\nDo that now? (Y/n)"
+    echo -e "\nIt is advised to edit the config personally for further options.\nDo that now? (Y/n)"
     read RESPONSE
     if [ "$RESPONSE" != "n" -a "$RESPONSE" != "N" ]
       then
@@ -265,6 +285,7 @@ if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssour
 fi      
 
 # Download the systemd unit file template
+echo -e "\nInstalling CS:S as a service..."
 # Avoid accidental overwriting of another unit file
 CI_UNITNAME="$CI_USER"
 while [ -f "/etc/systemd/system/$CI_UNITNAME.service" ]
@@ -285,14 +306,14 @@ if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssour
     chmod 644 "/etc/systemd/system/$CI_UNITNAME.service"
     # Modify the template
     sed -i "s#CI_HOME#$CI_HOME#g" "/etc/systemd/system/$CI_UNITNAME.service"
-    sed -i "s#CI_HOME#$CI_INSTALLDIR#g" "/etc/systemd/system/$CI_UNITNAME.service"
-    sed -i "s#CI_HOME#$CI_TMPDIR#g" "/etc/systemd/system/$CI_UNITNAME.service"
-    sed -i "s#CI_HOME#$CI_USER#g" "/etc/systemd/system/$CI_UNITNAME.service"
+    sed -i "s#CI_INSTALLDIR#$CI_INSTALLDIR#g" "/etc/systemd/system/$CI_UNITNAME.service"
+    sed -i "s#CI_TMPDIR#$CI_TMPDIR#g" "/etc/systemd/system/$CI_UNITNAME.service"
+    sed -i "s#CI_USER#$CI_USER#g" "/etc/systemd/system/$CI_UNITNAME.service"
     # Enable the service
     systemctl daemon-reload
     systemctl enable "$CI_UNITNAME"
     # Start the unit?
-    echo "Start the server now? (Y/n)"
+    echo -e "\nStart the server now? (Y/n)"
     read RESPONSE
     if [ "$RESPONSE" != "n" -a "$RESPONSE" != "N" ]
       then
@@ -306,5 +327,3 @@ fi
 echo "We're done!"
 # This movie is over
 exit 0
-
-
