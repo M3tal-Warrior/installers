@@ -134,7 +134,7 @@ chmod a+x "$CI_INSTALLDIR/bin/vpk_linux32"
 # Set logdir
 echo "Change the log directory for the service (default: $CI_LOGDIR_DEFAULT)"
 read CI_LOGDIR
-CI_LOGDIR="${CI_LOGDIR:-$CI_LOGDIR_DEFAULT})"
+CI_LOGDIR="${CI_LOGDIR:-$CI_LOGDIR_DEFAULT}"
 mkdir -p "$CI_LOGDIR"
 chown "$CI_USER" "$CI_LOGDIR"
 # Set tempdir
