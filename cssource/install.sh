@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# cs_source_install.sh
+# install.sh
 # Installs a dedicated Counter Strike Source server in a way that honors the 
 # FHS (Filesystem Hierarchy Standard) and grants minimal permissions to the
 # hosting user, as to minimize the impact of potential security flaws in the
-# software on the security of the system root and network.
+# software on security of system and network.
 
 
 # ================================= Copyright =================================
-# Version 0.1 (2019-11-26), Copyright (C) 2019
+# Version 0.1 (2019-12-03), Copyright (C) 2019
 # Author: Metal_Warrior
 # Coauthors: -
 
@@ -219,11 +219,12 @@ mkdir -p "$CI_INSTALLDIR/maps"
 chown -R "$CI_USER" "$CI_HOME"
 
 # Get the server config
-if wget https://github.com/M3tal-Warrior/installers/blob/master/cssource/servercfg.template -O "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
+if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/servercfg.template -O "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
   then
+    chmod 644 "$CI_INSTALLDIR/cstrike/cfg/server.cfg"
     # Ask for certain aspects of the server
     echo "Provide the name your gameserver will display in CS:S"
-    read "$CI_SERVERNAME"
+    read CI_SERVERNAME
     # Login password
     CI_LOGINPASSWD="$RANDOM$RANDOM$RANDOM$RANDOM"
     while [ "$CI_LOGINPASSWD" != "$CI_RETRY" ]
@@ -279,8 +280,9 @@ while [ -f "/etc/systemd/system/$CI_UNITNAME.service" ]
     fi
   done
 # Download
-if wget https://github.com/M3tal-Warrior/installers/blob/master/cssource/systemd_unit.template -O /etc/systemd/system/$CI_UNITNAME.service
+if wget https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/systemd_unit.template -O /etc/systemd/system/$CI_UNITNAME.service
   then
+    chmod 644 "/etc/systemd/system/$CI_UNITNAME.service"
     # Modify the template
     sed -i "s#CI_HOME#$CI_HOME#g" "/etc/systemd/system/$CI_UNITNAME.service"
     sed -i "s#CI_HOME#$CI_INSTALLDIR#g" "/etc/systemd/system/$CI_UNITNAME.service"
