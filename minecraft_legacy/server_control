@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ================================= Copyright =================================
-# Version 1.2 (2012-08-22), Copyright (C) 2011-2012
+# Version 1.3 (2012-11-14), Copyright (C) 2011-2012
 # Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
 
 #   This script is free software: you can redistribute it and/or modify it 
@@ -17,6 +17,7 @@
 #   distributed along with this script.
 #   See <http://www.gnu.org/licenses/> for the licence text.
 
+VERSION="1.3"
 
 # ================================== Settings =================================
 # Settings are inherited from the invocation script
@@ -79,7 +80,7 @@ mcc_give() {
   if [ "$VALUE2" = "" ]
     then 
       echo "Command is:" 
-      echo "’give <player> <item_nr> <amount> <damage_start> <damage_end'"
+      echo "’give <player> <item_nr (DEC)> <amount> <damage_start> <damage_end>'"
       echo "Player and item number are mandatory."
       exit 1
   fi
@@ -113,7 +114,7 @@ mcc_give() {
                   mcc_pipe
                   ;;
                 *)
-                  echo "Wrong variable set (SERVERTYPE)! Exiting..."
+                  echo "Wrong variable set (SERVERTYPE)! Aborting..."
                   exit 1
                   ;;
               esac
@@ -138,7 +139,7 @@ mcc_give() {
               mcc_pipe
               ;;
             *)
-              echo "Wrong variable set (SERVERTYPE)! Exiting..."
+              echo "Wrong variable set (SERVERTYPE)! Aborting..."
               exit 1
               ;;
           esac
@@ -162,7 +163,7 @@ mcc_give() {
           mcc_pipe
           ;;
         *)
-          echo "Wrong variable set (SERVERTYPE)! Exiting..."
+          echo "Wrong variable set (SERVERTYPE)! Aborting..."
           exit 1
           ;;
       esac
@@ -219,6 +220,7 @@ mc_critcheck() {
 }
 # Prints the console feedback of the command piped to the server
 mc_feedback() {
+  sleep 1
   cat "$MCPATH/server.log" | grep "$MCNOW"
 }
 
@@ -239,9 +241,17 @@ mc_start() {
   echo "Starting $SERVICE..."
   cd $MCPATH
   screen -dmS minecraft $INVOCATION
-  sleep 1
-  mc_check
-  if [ "$CHECK" ]
+  COUNTDOWN="0"
+  while [ "$COUNTDOWN" -le 20 ]
+    do
+      sleep 1
+      mc_check
+      if [ "$CHECK" = "" ]
+        then COUNTDOWN=$(( $COUNTDOWN + 1 ))
+        else COUNTDOWN="121"
+      fi
+    done
+  if [ "$CHECK" = "1" ]
     then
       echo "$SERVICE is now started, but may need some time to be fully operational."
     else
@@ -263,12 +273,12 @@ mc_stop() {
     do
       sleep 1
       mc_check
-      if [ "$CHECK" ]
+      if [ "$CHECK" = "1" ]
         then COUNTDOWN=$(( $COUNTDOWN + 1 ))
         else COUNTDOWN="121"
       fi
     done
-  if [ "$CHECK" ]
+  if [ "$CHECK" = "1" ]
     then 
       echo "Error! $SERVICE could not be stopped."
       exit 1
@@ -301,7 +311,10 @@ mc_saveoff() {
   mcc_saveoff
   mcc_saveall
   sync
-  sleep 10
+  if [ "$USE_RAMFS" = "yes" ]
+    then sleep 1
+    else sleep 10
+  fi      
 }
 
 # Enables the server saving to its files
@@ -328,57 +341,6 @@ mc_backup() {
   fi
 }
 
-# Updates (or installs) the server
-mc_update() {
-  mkdir -p $MCPATH
-  cd $MCPATH
-  wget -q -O update.tmp $UPDATEURL
-  if [ -f update.tmp ]
-    then 
-      if `diff $SERVICE update.tmp > /dev/null`
-        then
-          echo "You are already running the latest version of $SERVICE."
-          rm update.tmp
-        else
-          mc_check
-          if [ "$CHECK" ]
-            then 
-              mc_stop
-              mc_saveback
-          fi
-          mc_backup
-          mv update.tmp $SERVICE
-          mc_start
-          echo "Minecraft successfully updated."
-      fi
-    else echo "Minecraft update could not be downloaded."
-  fi
-}
-
-# Copys the server.log for further processing and clears it afterwards
-mc_newlog() {
-  cd $MCPATH
-  cp server.log server.log.tmp
-  echo -n "" > server.log
-}
-
-# Processes the server.log copy into specialized logfiles
-mc_clearlog() {
-  cd $MCPATH
-  if [ -f server.log.tmp ]
-    then 
-      cat server.log.tmp | grep -v "94.231.101.83" | \
-        grep -v "CONSOLE: Disabling level saving.." | \
-        grep -v "CONSOLE: Forcing save.." | \
-        grep -v "CONSOLE: Save complete." | \
-        grep -v "CONSOLE: Enabling level saving.." > server.log.old
-      cat server.log.tmp | grep "not white-listed" >> forbidden.log
-      cat server.log.tmp | grep "WARNING" | \
-        grep -v "Can't keep up! Did the server time change" >> warnings.log
-      rm server.log.tmp
-  fi
-}
-
 # Raw processing of some special commands and piping the rest
 mc_do() {
   COMMAND="$1"
@@ -400,6 +362,458 @@ mc_do() {
       ;;
   esac
 }
+
+# ............ Update subsection ............
+# Processes all update interaction with the user,
+# the script invocating and the update itself.
+
+# Pre-replacement checking and processing
+mc_updt_critical() {
+  if [ "$UPDT_ERROR" != "0" ]
+    then 
+      echo "Can't do stuff without that file! Aborting..."
+      cd
+      rm -rf $TEMPPATH
+      exit 1
+  fi
+
+}
+# Processing updates requiring root access (script files)
+mc_updt_prepare() {
+  UPDT_CHANGES=$(( $UPDT_CHANGES + 1 ))
+  echo "sudo chown root:root $UPDT_NEWPATH/$UPDT_NEWFILE
+sudo chmod $MOD $UPDT_NEWPATH/$UPDT_NEWFILE
+if [ -f $UPDT_OLDPATH/$UPDT_OLDFILE ]
+  then sudo mv $UPDT_OLDPATH/$UPDT_OLDFILE $TEMPPATH/$UPDT_OLDFILE.old
+fi
+sudo mv $UPDT_NEWPATH/$UPDT_NEWFILE $UPDT_OLDPATH/$UPDT_OLDFILE" >> $TEMPPATH/mc_updater.sh
+  echo "Done."
+}
+
+# Checking for file integrity with diff and version comparison
+mc_updt_integrity() {
+  if `diff $UPDT_OLDPATH/$UPDT_OLDFILE $UPDT_NEWPATH/$UPDT_NEWFILE > /dev/null`
+    then
+      echo "File up to date."
+      if [ "$UPDT_NEWFILE" != "updateurls.conf" ]
+        then rm $UPDT_NEWPATH/$UPDT_NEWFILE
+      fi
+    else
+      UPDT_OLDVERSION=`cat "$UPDT_OLDPATH/$UPDT_OLDFILE" | grep -m 1 "VERSION=" | cut -d '"' -f 2 -s`
+      UPDT_NEWVERSION=`cat "$UPDT_NEWPATH/$UPDT_NEWFILE" | grep -m 1 "VERSION=" | cut -d '"' -f 2 -s`
+      UPDT_VERSION_C=`echo "$UPDT_NEWVERSION>$UPDT_OLDVERSION" | bc`
+      if [ "$UPDT_VERSION_C" = "1" ]
+        then
+          echo "Preparing update..."
+        else
+          UPDT_VERSION_C=`echo "$UPDT_NEWVERSION==$UPDT_OLDVERSION" | bc`
+          echo "Downloaded version number of 
+$UPDT_FILE"
+          if [ "$UPDT_VERSION_C" = "1" ]
+            then echo "is IDENTICAL, but the files are different!"
+            else echo "is OLDER - that should be IMPOSSIBLE!"
+          fi
+          echo "This might indicate a security breach or unauthorized manipulation. 
+Update halted for you to investigate...
+[ Press ENTER to continue ]"
+          read UPDT_HALT
+          echo "Preparing replace..."
+      fi
+      mc_updt_prepare
+  fi
+}
+
+# Processes download and presence checks
+mc_updt_download() {
+  echo "
+Processing $UPDT_FILE..."
+  cd $TEMPPATH
+  wget -q $UPDT_URL
+  UPDT_NEWPATH="$TEMPPATH"
+  UPDT_NEWFILE=`basename $UPDT_URL`
+  UPDT_OLDPATH="$UPDT_PATH"
+  UPDT_OLDFILE="$UPDT_FILE"
+  if [ -f $UPDT_NEWPATH/$UPDT_NEWFILE ]
+    then
+      if [ -f $UPDT_OLDPATH/$UPDT_OLDFILE ]
+        then 
+          case $UPDT_TYPE in
+            bin)
+              # Server
+              if `diff $UPDT_OLDPATH/$UPDT_OLDFILE $UPDT_NEWPATH/$UPDT_NEWFILE > /dev/null`
+                then
+                  echo "File up to date."
+                  rm $UPDT_NEWPATH/$UPDT_NEWFILE
+                else
+                  echo "Processing update..."
+                  UPDT_CHANGES=$(( $UPDT_CHANGES + 1 ))
+              fi
+              ;;
+            config)
+              # Config files which are not to be edited by anyone,
+              # i.e. updateurls.conf
+              MOD="644"
+              mc_updt_integrity
+              ;;
+            core)
+              # Core files are autoconf.sh (the init writer) and server_control
+              MOD="755"
+              mc_updt_integrity
+              ;;
+            edit)
+              # All editable config files (currently none)
+              MOD="644"
+              UPDT_OLDVERSION=`cat "$UPDT_OLDPATH/$UPDT_OLDFILE" | grep -m 1 "VERSION=" | cut -d '"' -f 2 -s`
+              UPDT_NEWVERSION=`cat "$UPDT_NEWPATH/$UPDT_NEWFILE" | grep -m 1 "VERSION=" | cut -d '"' -f 2 -s`
+              UPDT_VERSION_C=`echo "$UPDT_NEWVERSION>$UPDT_OLDVERSION" | bc`
+              if [ "$UPDT_VERSION_C" = "1" ]
+                then
+                  echo "This seems to be a syntax update. Old files have to be converted manually."
+                  echo "[ Press ENTER to continue ]"
+                  read UPDT_HALT
+                  cp $UPDT_OLDPATH/$UPDT_OLDFILE $UPDT_OLDPATH/$UPDT_OLDFILE.old
+                  echo "Backup done."
+                  echo "Preparing update..."
+                  mc_updt_prepare
+              fi
+              ;;
+          esac
+        else
+          echo "Preparing install..."
+          mc_updt_prepare
+      fi 
+    else
+      echo "Couldn't download new version of $UPDT_OLDFILE - try again later!"
+      UPDT_ERROR=$(( $UPDT_ERROR + 1 ))
+  fi
+}
+
+# Preparing environment and crucial files
+mc_updt_step1() {
+  if [ "$SERVERTYPE" != "BUKKIT" -a "$SERVERTYPE" != "VANILLA" ]
+    then
+      echo "Invalid SERVERTYPE set! Aborting..."
+      exit 1
+  fi
+  UPDT_ERROR="0"
+  UPDT_CHANGES="0"
+  # Creating temporary update path
+  TEMPPATH=/dev/shm/mc_update.tmp.`date "+%Y.%m.%d_%H.%M"`
+  echo "Removing files that shouldn't be there anyway, to ensure secure environment..."
+  rm -rf $TEMPPATH
+  if [ -d $TEMPPATH ]
+    then 
+      echo "Something is weird here - check your environment for security breaches!"
+      exit 1
+  fi
+  mkdir $TEMPPATH
+  # Preparing updater script beginnings
+  echo "#!/bin/bash
+TEMPPATH=\"$TEMPPATH\"" > $TEMPPATH/mc_updater.sh
+  chmod a+x $TEMPPATH/mc_updater.sh
+  # Checking for update URLs file
+  cd $CONFIG_PATH
+  if [ -f $UPDATE_CONF ]
+    then
+      URL_UPDATE_CONF=`cat "$UPDATE_CONF" | grep "UPDATE_CONF" | cut -d '"' -f 2 -s`
+    else
+      echo "Can't find $UPDATE_CONF! Can't find download locations without! Aborting..."
+      exit 1
+  fi
+  # Getting new update URLs file
+  cd $TEMPPATH
+  UPDT_PATH="$CONFIG_PATH"
+  UPDT_FILE="$UPDATE_CONF"
+  UPDT_TYPE="config"
+  UPDT_URL="$URL_UPDATE_CONF"
+  mc_updt_download
+  mc_updt_critical
+  # Reading freshly downloaded config for maintenance and autoconfig script
+  URL_MAINTAIN_SCRIPT=`cat "$UPDT_NEWPATH/$UPDT_NEWFILE" | grep "MAINTAIN_SCRIPT" | cut -d '"' -f 2 -s`
+  URL_AUTOCONF=`cat "updateurls.conf" | grep "AUTOCONF" | cut -d '"' -f 2 -s`
+  # Downloading new maintenance script
+  cd $TEMPPATH
+  UPDT_PATH="$MAINTAIN_SCRIPT_PATH"
+  UPDT_FILE="$MAINTAIN_SCRIPT_NAME"
+  UPDT_TYPE="core"
+  UPDT_URL="$URL_MAINTAIN_SCRIPT"
+  mc_updt_download
+  mc_updt_critical
+  if [ -f $TEMPPATH/server_control ]
+    then chmod a+x $TEMPPATH/server_control
+  fi
+  # Downloading new autoconf script
+  cd $TEMPPATH
+  UPDT_PATH="$CONFIG_PATH"
+  UPDT_FILE="$AUTOCONF"
+  UPDT_TYPE="core"
+  UPDT_URL="$URL_AUTOCONF"
+  mc_updt_download
+  mc_updt_critical
+  if [ -f $TEMPPATH/autoconf.sh ]
+    then
+      # Invocating autoconf script
+      chmod a+x $TEMPPATH/autoconf.sh
+      export INITNAME
+      export NEWINIT="init"
+      export INSTALL
+      export UPDATE="1"
+      export MCUSERNAME
+      export SUDOER
+      export TEMPPATH
+      bash -c $TEMPPATH/autoconf.sh
+      INST_RETURN="$?"
+      echo ""
+      case $INST_RETURN in
+        0) 
+          echo "Initscript created."
+          echo ""
+          UPDT_INIT="1"  
+          # Parsing new init script for a modified temporary initializer for update
+          # step 2
+          echo "#!/bin/bash" > $TEMPPATH/mod_init.sh
+          chmod a+x $TEMPPATH/mod_init.sh
+          cat "$TEMPPATH/$NEWINIT" | grep -A 100 "# General settings" | grep -B 100 "Install invocation" >> $TEMPPATH/mod_init.sh
+          echo "export TEMPPATH=\"$TEMPPATH\"
+export UPDT_STEP=\"2\"
+export UPDT_CHANGES=\"$UPDT_CHANGES\"
+bash -c \"$TEMPPATH/server_control update\"
+UPDT_RETURN=\"$?\"
+if [ \"$UPDT_RETURN\" != \"0\" ]
+  then 
+    exit 1
+fi
+exit 0" >> $TEMPPATH/mod_init.sh
+          ;;
+        2)
+          # This applies when autoconf.sh detects an up to date init file
+          UPDT_INIT="0"
+          ;;
+        *)
+          echo "Something went terribly wrong during the procedure - can't continue!"
+          echo ""
+          exit 1
+          ;;
+      esac
+    else UPDT_INIT="0"
+  fi
+} 
+
+# Preparing update of all files
+mc_updt_step2() {
+  # Environment checks
+  if [ ! -d $TEMPPATH ]
+    then
+      echo "TEMPPATH couldn't be found! Aborting..."
+      exit 1
+    else cd $TEMPPATH
+  fi
+  if [ ! -x mc_updater.sh ]
+    then
+      echo "mc_updater.sh couldn't be found or isn't executable! Aborting..."
+      cd
+      rm -rf $TEMPPATH
+      exit 1
+  fi
+  if [ ! -f updateurls.conf ]
+    then
+      echo "UpdateURLs config file couldn't be found! Aborting..."
+      cd
+      rm -rf $TEMPPATH
+      exit 1
+  fi
+  # Reading in all update urls
+  URL_CMDGRID_CONF=`cat "updateurls.conf" | grep "CMDGRID_CONF" | cut -d '"' -f 2 -s`
+
+  # Getting files
+  UPDT_PATH="$CONFIG_PATH"
+  UPDT_FILE="$CMDGRID_CONF"
+  UPDT_TYPE="edit"
+  UPDT_URL="$URL_CMDGRID_CONF"
+  mc_updt_download
+
+  # Writing last sections of mc_updater.sh
+  echo "echo \"All script files updated!\"
+cd
+export INSTALL='3'
+bash -c /etc/init.d/$INITNAME
+exit 0" >> $TEMPPATH/mc_updater.sh
+  # Writing cleaner & checkup script mc_lastrites.sh
+  echo "#!/bin/bash
+TEMPPATH=\"$TEMPPATH\"
+SCRIPTBACKUP=\"\$BACKUPPATH/scripts_\`date \"+%Y.%m.%d_%H.%M\"\`\" 
+sudo mkdir -p \$SCRIPTBACKUP
+cd $TEMPPATH
+sudo rm -f updateurls.conf
+sudo rm -f mc_initupdate.sh
+sudo rm -f mc_updater.sh
+cd /dev/shm
+sudo mv $TEMPPATH \$SCRIPTBACKUP
+if [ -f /etc/init.d/$INITNAME ]
+  then
+    echo \"Reactor online...\"
+    sleep 1
+  else
+    echo \"Initscript not found - Bail out! Bail out!\"
+    exit 1
+fi
+if [ -f \$MAINTAIN_SCRIPT_PATH/\$MAINTAIN_SCRIPT_NAME ]
+  then
+    echo \"Sensors online...\"
+    sleep 1
+  else
+    echo \"Maintenance script not found - Bail out! Bail out!\"
+    exit 1
+fi
+if [ -f \$SERVERPATH/\$SERVICE ]
+  then
+    echo \"Weapons online...\"
+    sleep 1
+  else
+    echo \"Binary not found - Bail out! Bail out!\"
+    exit 1
+fi
+export INSTALL='0'
+LAUNCH=\$(bash -c \"/etc/init.d/$INITNAME status\" | grep -c \"is running.\")
+if [ \"$LAUNCH\" = \"1\" ]
+  then
+    sleep 1
+    echo \"All systems nominal!\"
+    sleep 1
+    echo \"Now everything lies in your hands again, lance leader!\"
+    sleep 4
+  else
+    echo \"Systems failure - ! SERVER DOWN ! - state critical - Bail out! Bail out!\"
+    exit 1
+fi
+exit 0" > /dev/shm/mc_lastrites.sh
+  chmod a+x /dev/shm/mc_lastrites.sh
+  if [ "$UPDT_CHANGES" = "0" ]
+    then
+      echo "All scripts up to date."
+      rm -r $TEMPPATH
+      rm /dev/shm/mc_lastrites.sh
+      UPDT_RETURN="0"
+  elif [ "$SUDOER" = "yes" ]
+    then
+      bash -c $TEMPPATH/mc_initupdater.sh
+      UPDT_RETURN="$?"
+    else 
+      echo "Please provide user with root permissions to update script files:"
+      read UPDT_USER
+      su $UPDT_USER -c "$TEMPPATH/mc_initupdater.sh"
+      UPDT_RETURN="$?"
+  fi
+  if [ "$UPDT_RETURN" != "0" ]
+    then 
+      echo "#!/bin/bash
+bash -c $TEMPPATH/mc_initupdater.sh
+if [ \"\$?\" != \"0\" ]
+  then
+    echo \"There is no way to do these operations without sudoer rights! Aborting...\"
+    exit 1
+fi
+echo \"Proceeding with binaries...\"
+if [ \"\$USER\" != \"root\" -a \"\$USER\" != \"$MCUSERNAME\" ]
+  then echo \"Password asked for is the user password of $MCUSERNAME.\"
+fi
+bash -c \"/etc/init.d/$INITNAME binupdate\"
+rm /dev/shm/mc_startupdate.sh
+rm 
+exit 0" > /dev/shm/mc_startupdate.sh
+      chmod a+x /dev/shm/mc_startupdate.sh
+      echo "Something went wrong! Aborting..."
+      echo "To resume this update by a sudoer user go to /dev/shm and invocate 
+mc_startupdate.sh. It will do the rest as if nothing went wrong."
+      exit 1
+    else echo "Proceeding with binaries..."
+  fi
+
+}
+
+# Doing all binaries
+mc_updt_step3() {
+  UPDT_CHANGES="0"
+  TEMPPATH=/dev/shm/mc_update.tmp.`date "+%Y.%m.%d_%H.%M"`
+  mkdir -p $TEMPPATH
+  cd $CONFIG_PATH
+  URL_SERVICE=`cat "$UPDATE_CONF" | grep "$SERVERTYPE" | cut -d '"' -f 2 -s`
+  # Downloading server binary
+  UPDT_PATH="$MCPATH"
+  UPDT_FILE="$SERVICE"
+  UPDT_TYPE="bin"
+  UPDT_URL="$URL_SERVICE"
+  mc_updt_download
+  if [ "$UPDT_CHANGES" != "0" ]
+    then
+      mc_check
+      if [ "$CHECK" ]
+        then 
+          mc_stop
+          mc_saveback
+      fi
+      mc_backup
+      mv $UPDT_NEWPATH/$UPDT_NEWFILE $UPDT_OLDPATH/$UPDT_OLDFILE
+      mc_start
+    echo "Server binary successfully updated and started."
+  fi
+}
+
+# Main update controller
+mc_update() {
+  case $UPDT_STEP in
+    2)
+      # This is only invocated if the init file version has changed
+      mc_updt_step2
+      exit 0
+      ;;
+    3)
+      # This is invocated to update the server binary
+      mc_updt_step3
+      ;;
+    *)
+      # Doing the whole updating process
+      mc_updt_step1
+      if [ "$UPDT_INIT" = "1" ]
+        then bash -c $TEMPPATH/mod_init.sh
+        else mc_updt_step2
+      fi
+      mc_updt_step3
+      echo "All update actions completed."
+      ;;
+  esac
+}
+# ............ Log chopup subsection ............
+# Processes all log reprocessing actions for clean
+# logfiles to backup lateron
+
+# Copys the server.log for further processing and clears it afterwards
+mc_newlog() {
+  cd $MCPATH
+  cp server.log server.log.tmp
+  echo -n "" > server.log
+}
+
+# Processes the server.log copy into specialized logfiles
+mc_clearlog() {
+  cd $MCPATH
+  if [ -f server.log.tmp ]
+    then 
+      cat server.log.tmp | grep -v "94.231.101.83" | \
+        grep -v "CONSOLE: Disabling level saving.." | \
+        grep -v "CONSOLE: Forcing save.." | \
+        grep -v "CONSOLE: Save complete." | \
+        grep -v "CONSOLE: Enabling level saving.." > server.log.`date "+%Y.%m.%d"`
+      cat server.log.tmp | grep "not white-listed" >> forbidden.log
+      cat server.log.tmp | grep "WARNING" | \
+        grep -v "Can't keep up! Did the server time change" >> warnings.log
+      rm server.log.tmp
+  fi
+}
+
+# ............ Rollback subsection ............
+# Processes all rollback interaction with the user
+# and the rollback itself.
 
 # Sanity check for "directory" mode of rollback
 mc_rbdir() {
@@ -550,14 +964,22 @@ if [ "$USE_RAMFS" = "yes" ]
   else MCPATH="$SERVERPATH"
 fi
 
+# Head
+echo "======================= M3tal_Warriors Minecraft script ======================="
+# Thank you!
+echo "Special thanks for bug reporting & feature request:"
+echo "* MinecraftWiki user Ben Albon for 2 reported bugs"
+echo ""
+
 case "$1" in
   start)
     mc_check
     if [ "$CHECK" ]
       then
-        echo "Service already running!"
+        echo "Minecraft server already running!"
         exit 1
       else
+        echo "Starting Minecraft server..."
         mc_upramfs
         mc_start
     fi
@@ -574,6 +996,10 @@ case "$1" in
     mc_start
     ;;
   update)
+    mc_update
+    ;;
+  binupdate)
+    UPDT_STEP="3"
     mc_update
     ;;
   save)
@@ -633,7 +1059,16 @@ case "$1" in
     ;;
   do)
     mc_critcheck
-    mc_do "$2" "$3" "$4" "$5" "$6" "$7"
+    shift
+    if [ "$*" = "" ]
+      then
+        echo "What should I do? Make you a sandwich? Go to bed? Since you don't seem to know, 
+I do exactly what you requested:
+I will do NOTHING!
+Hope you like that."
+        exit 1
+    fi
+    mc_do "$*"
     mc_feedback
     ;;
   cronbackup)
@@ -658,7 +1093,8 @@ case "$1" in
     echo "* start       Starts the server"
     echo "* stop        Stops the server"
     echo "* restart     Restarts the server"
-    echo "* update      Updates the server file"
+    echo "* update      Updates server binary and script files (root access needed!)"
+    echo "* binupdate   Updates only the server binary (no root access needed)"
     echo "* save        Saves everything to disk"
     echo "* backup      Backups the server into the defined directory"
     echo "* rollback    Rolls back to a previous backup"
