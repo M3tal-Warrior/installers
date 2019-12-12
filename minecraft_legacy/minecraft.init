@@ -1,0 +1,100 @@
+#!/bin/bash
+# /etc/init.d/minecraft
+
+### BEGIN INIT INFO
+# Provides:   minecraft
+# Required-Start: $local_fs $remote_fs mysql
+# Required-Stop:  $local_fs $remote_fs mysql
+# Should-Start:   $network
+# Should-Stop:    $network
+# Default-Start:  2 3 4 5
+# Default-Stop:   0 1 6
+# Short-Description:    Minecraft server
+# Description:    Invocates the minecraft server maintenance script
+### END INIT INFO
+
+# ================================= Copyright =================================
+# Version 1.2 (2012-08-22), Copyright (C) 2011-2012
+# Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
+
+#   This script is free software: you can redistribute it and/or modify it 
+#   under the terms of the GNU General Public License as published by the 
+#   Free Software Foundation, either version 3 of the License, or any later 
+#   version.
+#   This program is distributed in the hope that it will be useful, but 
+#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+#   or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+#   for more details.
+
+#   As this is only a script, theres no copy of the GNU General Public License 
+#   distributed along with this script.
+#   See <http://www.gnu.org/licenses/> for the licence text.
+
+
+# ================================= Settings ==================================
+# Here you can change almost everything for the script to fill your needs.
+# For information on the possible settings view the commented script at 
+# http://www.minecraftwiki.net/wiki/M3tal_Warrior_Server_Startup_Script
+
+# General settings
+MAINTAIN_SCRIPT_PATH='/opt/minecraft'
+MAINTAIN_SCRIPT_NAME='server_control'
+USERNAME='minecraft'
+SERVERTYPE='Bukkit'
+SERVICE='minecraft_server.jar'
+SERVERPATH='/opt/minecraft/server'
+BACKUPPATH='/opt/minecraft/backup'
+
+# Advanced settings
+CPU_COUNT=2
+MIN_SERVER_RAM='2G'
+MAX_SERVER_RAM='2G'
+JVM_OPTIONS='nogui'
+USE_RAMFS='no'
+USE_RAMDIR='minecraft'
+
+# Expert settings
+UPDATEBUKKIT="http://dl.bukkit.org/latest-rb/craftbukkit.jar"
+UPDATEVANILLA="https://s3.amazonaws.com/MinecraftDownload/launcher/minecraft_server.jar"
+INVOCATION="java -Xmx$MAX_SERVER_RAM -Xms$MIN_SERVER_RAM -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalPacing -XX:ParallelGCThreads=$CPU_COUNT -XX:+AggressiveOpts -jar $SERVICE $JVM_OPTIONS"
+
+# ============================= Script invocation =============================
+# Since there was trouble with the user setting (being overridden by startup
+# and such) and I splitted the script in an init script and a maintenance
+# script. The latter is thus always invocated with the right user environment 
+# and can be located anywhere in the system
+
+# ----------------------------- Download selection ----------------------------
+# Selects the download location depending on what server you like to use.
+case "$SERVERTYPE" in
+  Vanilla)
+    UPDATEURL="$UPDATEVANILLA"
+    ;;
+  Bukkit)
+    UPDATEURL="$UPDATEBUKKIT"
+    ;;
+  *)
+    echo "No valid server type has been provided - Exiting..."
+    exit 1
+    ;;
+esac
+
+# ------------------------------ Variable export ------------------------------
+# Don't change anything in here! It exports the relevant settings for the 
+# maintainance script to use them (by inheriting / making them envvars).
+export SERVERTYPE
+export SERVICE
+export USE_RAMFS
+export USE_RAMDIR
+export SERVERPATH
+export BACKUPPATH
+export INVOCATION
+export UPDATEURL
+
+# -------------------------------- Invocation ---------------------------------
+if [ `whoami` = "$USERNAME" ] ; then
+  bash -c "$MAINTAIN_SCRIPT_PATH/$MAINTAIN_SCRIPT_NAME $*"
+else
+  su $USERNAME -c "$MAINTAIN_SCRIPT_PATH/$MAINTAIN_SCRIPT_NAME $*"
+fi
+exit 0
