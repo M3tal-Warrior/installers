@@ -5,7 +5,7 @@
 # server maintenance package.
 
 # ================================= Copyright =================================
-# Version 1.00 (2012-11-08), Copyright (C) 2011-2012
+# Version 1.0.1 (2017-06-08), Copyright (C) 2011-2017
 # Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
 
 #   This script is free software: you can redistribute it and/or modify it 
@@ -29,7 +29,7 @@ server maintenance package.
 INSTALL="1"
 UPDATE="0"
 INST_NOOB="0"
-SCRIPT_UPDATEURL="http://mcserver.blacksky-dev.com/scripts/alpha"
+SCRIPT_UPDATEURL="http://mcserver.blacksky-dev.com/scripts/minecraft"
 TEMPPATH=/dev/shm/mc_update.tmp
 NEWINIT="init"
 

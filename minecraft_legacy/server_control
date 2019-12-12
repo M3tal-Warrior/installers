@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ================================= Copyright =================================
-# Version 1.3 (2012-11-14), Copyright (C) 2011-2012
+# Version 1.3.1 (2013-08-08), Copyright (C) 2011-2013
 # Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
 
 #   This script is free software: you can redistribute it and/or modify it 
@@ -17,7 +17,7 @@
 #   distributed along with this script.
 #   See <http://www.gnu.org/licenses/> for the licence text.
 
-VERSION="1.3"
+VERSION="1.3.1"
 
 # ================================== Settings =================================
 # Settings are inherited from the invocation script
@@ -30,7 +30,7 @@ VERSION="1.3"
 # These commands prepare for direct interaction with the minecraft server by 
 # using the buildin commands. Every such module name starts with mcc_.
 
-# Interaction (in and out) itself is processed by mcc_pipe.
+# Interaction itself is processed by mcc_pipe.
 mcc_pipe() {
   screen -p 0 -S minecraft -X eval "stuff \"$PIPE\"\015"
   MCNOW=`date +"%Y-%m-%d %H:%M:%S"`
@@ -738,6 +738,13 @@ mc_updt_step3() {
   mkdir -p $TEMPPATH
   cd $CONFIG_PATH
   URL_SERVICE=`cat "$UPDATE_CONF" | grep "$SERVERTYPE" | cut -d '"' -f 2 -s`
+  # Workaround for Mojang deleting the static link to the server bin.
+  if [ "$SERVERTYPE" = "VANILLA" ]
+    then
+      cd $TEMPPATH
+      wget -qO site.tmp $URL_SERVICE
+      URL_SERVICE=`cat site.tmp | grep -i "server" | grep -i "Linux" | sed 's/href=/%/g' | cut -d % -f 3 -s | cut -d '"' -f 2 -s`
+  fi
   # Downloading server binary
   UPDT_PATH="$MCPATH"
   UPDT_FILE="$SERVICE"
@@ -757,6 +764,7 @@ mc_updt_step3() {
       mc_start
     echo "Server binary successfully updated and started."
   fi
+  rm -rf $TEMPPATH
 }
 
 # Main update controller
@@ -969,6 +977,7 @@ echo "======================= M3tal_Warriors Minecraft script ==================
 # Thank you!
 echo "Special thanks for bug reporting & feature request:"
 echo "* MinecraftWiki user Ben Albon for 2 reported bugs"
+echo "* MinecraftWiki user Caboose684 for helping with the 1.6 vanilla update problem"
 echo ""
 
 case "$1" in

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ================================= Copyright =================================
-# Version 1.1 (2013-01-25), Copyright (C) 2011-2013
+# Version 1.1 (2013-08-08), Copyright (C) 2011-2013
 # Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
 
 #   This script is free software: you can redistribute it and/or modify it 
@@ -27,8 +27,8 @@
 # The version statement keeps track of all scripts and changes therein. It has
 # nothing to do with the minecraft version you're running.
 # DON'T CHANGE THIS NUMBER!
-AC_VERSION="1.3"
-AC_DATE="2012-11-14"
+AC_VERSION="1.3.1"
+AC_DATE="2013-08-08"
 
 # Greeting message
 echo "
