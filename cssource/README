@@ -1,4 +1,0 @@
-This is an installer for CounterStrike Source dedicated headless servers running
-Debian Buster. That usually should make it working for Ubuntu and Mate too.
-
-Download the script (installer.sh) and run it as root.
