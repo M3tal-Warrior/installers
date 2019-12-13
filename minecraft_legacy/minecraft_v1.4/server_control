@@ -1,0 +1,856 @@
+#!/bin/bash
+
+# ================================= Copyright =================================
+# Version 1.31 (2013-08-08), Copyright (C) 2011-2013
+# Author: M3tal_Warrior (http://www.minecraftwiki.net/wiki/User:M3tal_Warrior)
+
+#   This script is free software: you can redistribute it and/or modify it 
+#   under the terms of the GNU General Public License as published by the 
+#   Free Software Foundation, either version 3 of the License, or any later 
+#   version.
+#   This program is distributed in the hope that it will be useful, but 
+#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+#   or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+#   for more details.
+
+#   As this is only a script, theres no copy of the GNU General Public License 
+#   distributed along with this script.
+#   See <http://www.gnu.org/licenses/> for the licence text.
+
+VERSION="1.31"
+
+# ================================== Settings =================================
+# Settings are inherited from the invocation script
+
+# ================================== Modules ==================================
+# The script is highly modular to work on repetitive tasks more easily.
+
+# --------------------- Server command processing section ---------------------
+# These commands prepare for direct interaction with the minecraft server by 
+# using the buildin commands. Every such module name starts with mcc_.
+
+# Interaction itself is processed by mcc_pipe.
+mcc_pipe() {
+  screen -p 0 -S $INITNAME -X eval "stuff \"$PIPE\"\015"
+  MCNOW=`date +"%Y-%m-%d %H:%M:%S"`
+}
+
+# Save all changes to the server files
+mcc_saveall() {
+  PIPE="save-all"
+  mcc_pipe
+}
+
+# Prohibit the server saving to its files
+mcc_saveoff() {
+  PIPE="save-off"
+  mcc_pipe
+}
+
+# Allow the server saving to its files
+mcc_saveon() {
+  PIPE="save-on"
+  mcc_pipe
+}
+
+# Sends a console message out
+mcc_say() {
+  if [ "$VALUE1" ]
+    then 
+      PIPE="say $VALUE1"
+      mcc_pipe
+    else
+      echo "Must specify what to say!"
+      exit 1
+  fi
+}
+
+# Gracefully shuts down the server
+mcc_stop() {
+  PIPE="stop"
+  mcc_pipe
+}
+
+# Give named player a defined while (theoretically) unlimited number of items/
+# blocks with given damage value. Note: If you type in 2 damage values, the 
+# script will give the player for every damage value within the range the 
+# number of items/blocks chosen, regardless of existance. BE CAREFUL!
+mcc_give() {
+  if [ "$VALUE2" = "" ]
+    then 
+      echo "Command is:" 
+      echo "’give <player> <item_nr (DEC)> <amount> <damage_start> <damage_end>'"
+      echo "Player and item number are mandatory."
+      exit 1
+  fi
+  if [ "$VALUE3" = "" ]
+    then VALUE3=1
+  fi
+  MULT=$(( $VALUE3 / 64 ))
+  REST=$(( $VALUE3 % 64 ))
+  if [ "$VALUE4" ]
+    then
+      DAMAGE="$VALUE4"
+      if [ "$VALUE5" ]
+        then 
+          while [ "$DAMAGE" -le "$VALUE5" ]
+            do
+              case $SERVERTYPE in
+                Vanilla)
+                  while [ "$MULT" -ge "0" ]
+                    do 
+                      if [ "$MULT" = "0" ]
+                        then VALUE3="$REST"
+                        else VALUE3="64"
+                      fi
+                      MULT=$(( $MULT - 1 ))
+                      PIPE="give $VALUE1 $VALUE2 $VALUE3 $DAMAGE"
+                      mcc_pipe
+                    done
+                  ;;
+                Bukkit)
+                  PIPE="give $VALUE1 $VALUE2:$DAMAGE $VALUE3"
+                  mcc_pipe
+                  ;;
+                *)
+                  echo "Wrong variable set (SERVERTYPE)! Aborting..."
+                  exit 1
+                  ;;
+              esac
+              DAMAGE=$(( $DAMAGE + 1 ))
+            done
+        else 
+          case $SERVERTYPE in
+            Vanilla)
+              while [ "$MULT" -ge "0" ]
+                do 
+                  if [ "$MULT" = "0" ]
+                    then VALUE3="$REST"
+                    else VALUE3="64"
+                  fi
+                  MULT=$(( $MULT - 1 ))
+                  PIPE="give $VALUE1 $VALUE2 $VALUE3 $DAMAGE"
+                  mcc_pipe
+                done
+              ;;
+            Bukkit)
+              PIPE="give $VALUE1 $VALUE2:$DAMAGE $VALUE3"
+              mcc_pipe
+              ;;
+            *)
+              echo "Wrong variable set (SERVERTYPE)! Aborting..."
+              exit 1
+              ;;
+          esac
+      fi
+    else
+      case $SERVERTYPE in
+        Vanilla)
+          while [ "$MULT" -ge "0" ]
+            do 
+              if [ "$MULT" = "0" ]
+                then VALUE3="$REST"
+                else VALUE3="64"
+              fi
+              MULT=$(( $MULT - 1 ))
+              PIPE="give $VALUE1 $VALUE2 $VALUE3"
+              mcc_pipe
+            done
+          ;;
+        Bukkit)
+          PIPE="give $VALUE1 $VALUE2 $VALUE3"
+          mcc_pipe
+          ;;
+        *)
+          echo "Wrong variable set (SERVERTYPE)! Aborting..."
+          exit 1
+          ;;
+      esac
+  fi
+}
+
+# Gives named player a defined while (theoretically) unlimited amount of 
+# experience orbs
+mcc_xp() {
+  if [ "$VALUE2" = "" ]
+    then 
+      echo "Command is:" 
+      echo "’xp <player> <amount>’"
+      echo "Player and amount are mandatory."
+      exit 1
+  fi
+  MULT=$(( $VALUE2 / 5000 ))
+  REST=$(( $VALUE2 % 5000 ))
+  while [ "$MULT" -ge "0" ]
+    do
+      if [ "$MULT" = "0" ]
+        then VALUE2="$REST"
+        else VALUE2="5000"
+      fi
+      MULT=$(( $MULT - 1 ))
+      PIPE="xp $VALUE1 $VALUE2"
+      mcc_pipe
+    done
+}
+
+# --------------------- General command processing section --------------------
+# These modules are for managing the server itself and its environment. Some of
+# them use the modules above, but not all of them. Every module in here has mc_
+# as prefix.
+
+# Short hello and special thanks.
+mc_head() {
+echo "======================= M3tal_Warriors Minecraft script =======================
+"
+echo "Special thanks for bug reporting & feature request:"
+echo "* MinecraftWiki user Ben Albon for 2 reported bugs"
+echo "* MinecraftWiki user Caboose684 for helping with the 1.6 vanilla update problem"
+echo ""
+}
+
+# Checks if the server is running
+mc_check() {
+  if ps ax | grep -v grep | grep -v -i SCREEN | grep $SERVICE > /dev/null
+    then CHECK="1"
+    else CHECK=""
+  fi
+}
+
+# Checks if the server is running and exits if not
+mc_critcheck() {
+  mc_check
+  if [ "$CHECK" = "" ]
+    then 
+      if [ "$CRON" != "1" ]
+        then echo "$INITNAME is not running - exiting..."
+      fi
+      exit 1
+  fi
+}
+# Prints the console feedback of the command piped to the server
+mc_feedback() {
+  sleep 1
+  tail "$MCPATH/server.log" | grep "$MCNOW"
+}
+
+# Manages the RAMFS option
+mc_upramfs() {
+  if [ "$USE_RAMFS" = "yes" ]
+    then
+      mkdir -p $RAMPATH
+      echo "Copying files to RAMFS..."
+      rsync -ahu $SERVERPATH/ $RAMPATH
+      SERVERSIZE=`du -sh $RAMPATH | gawk '{print $1}'`
+      echo "$SERVERSIZE in total done."
+  fi
+}
+
+# Starts the server 
+mc_start() {
+  echo "Starting $INITNAME..."
+  cd $MCPATH
+  screen -dmS $INITNAME $INVOCATION
+  COUNTDOWN="0"
+  while [ "$COUNTDOWN" -le 20 ]
+    do
+      sleep 1
+      mc_check
+      if [ "$CHECK" = "" ]
+        then COUNTDOWN=$(( $COUNTDOWN + 1 ))
+        else COUNTDOWN="121"
+      fi
+    done
+  if [ "$CHECK" = "1" ]
+    then
+      echo "$INITNAME is now started, but may need some time to be fully operational."
+    else
+      echo "ERROR! Could not start $INITNAME!"
+      exit 1
+  fi
+}
+
+# Shuts the server down
+mc_stop() {
+  echo "Stopping $INITNAME"
+  VALUE1="SERVER SHUTTING DOWN IN 10 SECONDS."
+  mcc_say
+  mcc_saveall
+  sleep 10
+  mcc_stop
+  COUNTDOWN="0"
+  while [ "$COUNTDOWN" -le 20 ]
+    do
+      sleep 1
+      mc_check
+      if [ "$CHECK" = "1" ]
+        then COUNTDOWN=$(( $COUNTDOWN + 1 ))
+        else COUNTDOWN="121"
+      fi
+    done
+  if [ "$CHECK" = "1" ]
+    then 
+      echo "Error! $INITNAME could not be stopped."
+      exit 1
+    else
+      sleep 2
+      echo "$INITNAME is now stopped."
+  fi
+}
+
+# Writes the files in RAMFS back to harddisk
+mc_saveback() {
+  if [ "$USE_RAMFS" = "yes" ]
+    then
+      SERVERSIZE=`du -sh $RAMPATH | awk '{print $1}'`
+      echo "Incremental save of $SERVERSIZE to harddisk..."
+      rsync -ahu $RAMPATH/ $SERVERPATH
+      echo "Done."
+  fi
+  sync
+}
+
+# Disables the server saving to its files
+mc_saveoff() {
+  if [ "$CRON" != "1" ]
+    then
+      echo "$INITNAME is running... suspending saves"
+      VALUE1="Server going readonly..."
+      mcc_say
+  fi
+  mcc_saveoff
+  mcc_saveall
+  sync
+  if [ "$USE_RAMFS" = "yes" ]
+    then sleep 1
+    else sleep 10
+  fi      
+}
+
+# Enables the server saving to its files
+mc_saveon() {
+  if [ "$CRON" != "1" ]
+    then 
+      echo "$INITNAME is running... re-enabling saves"
+      VALUE1="Server going read-write..."
+      mcc_say
+  fi
+  mcc_saveon
+}
+
+# Copys the harddisk files to backup directory
+mc_backup() {
+  if [ "$CRON" != "1" ]
+    then
+      echo "Backing up minecraft server..."
+  fi
+  rsync -au $SERVERPATH/ $BACKUPPATH/server_`date "+%Y.%m.%d_%H.%M"`
+  fi
+  if [ "$CRON" != "1" ]
+    then
+      echo "Backup complete!"
+  fi
+}
+
+# Raw processing of some special commands and piping the rest
+mc_do() {
+  COMMAND="$1"
+  VALUE1="$2"
+  VALUE2="$3"
+  VALUE3="$4"
+  VALUE4="$5"
+  VALUE5="$6"
+  case "$COMMAND" in
+    give)
+      mcc_give
+      ;;
+    xp)
+      mcc_xp
+      ;;
+    *)
+      PIPE="$*"
+      mcc_pipe
+      ;;
+  esac
+}
+
+# ............ Update & install ................
+
+# Downloads the updater script and invocates it, 
+# so it's always fresh and crispy
+mc_scriptupdate() {
+  URL_UPDATER=`cat "$CONFIG_PATH/$UPDATE_CONF" | grep "UPDATER" | cut -d '"' -f 2 -s`
+  cd /dev/shm
+  wget -q $URL_UPDATER
+  UPDATER=`basename $URL_UPDATER`
+  if [ -f $UPDATER ]
+    then
+      chmod a+x $UPDATER
+      PARENT=`grep -m 1 ":" $CONFIG_PATH/$SERVERS_CONF | cut -d ':' -f 2 -s`
+      if [ -f /etc/init.d/$PARENT ]
+        then INIT_PARENT="$PARENT"
+        else INIT_PARENT="$INITNAME"
+      fi
+      export INIT_PARENT
+      export MODE="script"
+      bash -c $UPDATER
+      rm -f $UPDATER
+    else
+      echo "Couldn't get the updater. Try again later..."
+      exit 1
+  fi
+}
+
+# Invocates the available updater script to perform an update
+# of the server binaries.
+mc_binupdate() {
+  export MODE="bin"
+  export INIT_PARENT="$INITNAME"
+  bash -c $CONFIG_PATH/$UPDATER
+}
+
+# Performs installation of a new server
+mc_installer() {
+  if [ "$NEW_SERVER" = "" ]
+    then
+      echo "Parameter missing! Aborting..."
+      exit 1
+  fi
+  if grep ":$NEW_SERVER:" "$CONFIG_PATH/$SERVERS_CONF" > /dev/null
+    then
+      echo "Server already existing! No action will be taken..."
+      exit 1
+  fi
+  export MODE="install"
+  export INITNAME="$NEW_SERVER"
+  export INIT_PARENT=`grep ":" "$CONFIG_PATH/$SERVERS_CONF" | head -n 1`
+  
+}
+
+
+# ............ Log chopup subsection ............
+# Processes all log reprocessing actions for clean
+# logfiles to backup lateron
+
+# Copys the server.log for further processing and clears it afterwards
+mc_newlog() {
+  cd $MCPATH
+  cp server.log server.log.tmp
+  echo -n "" > server.log
+}
+
+# Processes the server.log copy into specialized logfiles
+mc_clearlog() {
+  cd $MCPATH
+  if [ -f server.log.tmp ]
+    then 
+      cat server.log.tmp | grep -v "94.231.101.83" | \
+        grep -v "CONSOLE: Disabling level saving.." | \
+        grep -v "CONSOLE: Forcing save.." | \
+        grep -v "CONSOLE: Save complete." | \
+        grep -v "CONSOLE: Enabling level saving.." > server.log.`date "+%Y.%m.%d"`
+      cat server.log.tmp | grep "not white-listed" >> forbidden.log
+      cat server.log.tmp | grep "WARNING" | \
+        grep -v "Can't keep up! Did the server time change" >> warnings.log
+      rm server.log.tmp
+  fi
+}
+
+# ............ Rollback subsection ..............
+# Processes all rollback interaction with the user
+# and the rollback itself.
+
+# Sanity check for "directory" mode of rollback
+mc_rbdir() {
+  RB_UNDO="0"
+  if [ -d $1 ]
+    then ROLLBACK_FROM=${1%/}
+    else 
+      echo "Can't find directory, aborting..."
+      exit 1
+  fi
+}
+# Sanity check for "last" mode of rollback and selection of source directory
+mc_rblast() {
+  RB_UNDO="0"
+  if [ ! "$1" ]
+    then RB_NUM="1"
+    else 
+      if [[ "$1" = ?(+|-)+([0-9]) ]]
+        then RB_NUM="$1"
+        else 
+          echo "No number given, aborting..."
+          exit 1
+      fi
+  fi
+  cd $BACKUPPATH
+  BACKUPDIR=$(ls -1 | grep "server_" | tail -n $RB_NUM | head -n 1)
+  ROLLBACK_FROM="$BACKUPPATH/$BACKUPDIR"
+}
+
+# Directory selection for "sel" mode of rollback
+mc_rbsel() {
+  RB_UNDO="0"
+  cd $BACKUPPATH
+  while [ "$SELECTION" != "1" ] 
+    do 
+      echo `ls -1 | grep "server_"`
+      echo "Type in the directory to use:"
+      read BACKUPDIR
+      SELECTION=$(ls -1 | grep -c $BACKUPDIR)
+      if [ $SELECTION = "0" ]
+        then echo "Search pattern has no matching directory!"
+      fi
+      if [ $SELECTION -gt "1" ]
+        then echo "Search pattern has too many matching directories!"
+      fi
+    done
+  BACKUPDIR=$(ls -1 | grep $BACKUPDIR)
+  ROLLBACK_FROM=$BACKUPPATH/$BACKUPDIR
+}
+
+# Setting "undo rollback" variables
+mc_rbundo() {
+  RB_UNDO="1"
+  ROLLBACK_FROM="$BACKUPPATH/rb_undo"
+}
+
+# Affirmation and rollback/undo procedure
+mc_rollback() {
+  if [ "$ROLLBACK_FROM" = "$BACKUPPATH/rb_undo" -a "$RB_UNDO" = "0" ]
+    then 
+      echo "You can't undo a rollback this way! Use ’rollback undo’ instead!"
+      exit 1
+  fi
+  if [ "$RB_UNDO" = "1" ]
+    then
+      echo "Do you really want to undo your last rollback? (y/n)"
+      read OKAY
+      RB_MSG1="Undo"
+      RB_MSG2="undo"
+      RB_MSG3="Undo previous rollback..."
+      RB_MSG4="Previous changes to the server successfully undone."
+    else
+      echo "If you want to undo a rollback, use ’rollback undo’, for anything else"
+      echo "WILL OVERWRITE the last undo snapshot!"
+      echo "You really want to roll back to the snapshot $ROLLBACK_FROM? (y/n)"
+      read OKAY
+      RB_MSG1="Rollback"
+      RB_MSG2="rollback"
+      RB_MSG3="Rolling back..."
+      RB_MSG4="Server successfully rolled back to desired date."
+  fi
+  if [ "$OKAY" != "y" ]
+    then
+      echo "$RB_MSG1 aborted - nothing was changed."
+      exit 0
+  fi
+  echo "Launching $RB_MSG2 procedure..."
+  mc_check
+  if [ "$CHECK" ]
+    then 
+      mc_stop
+      mc_saveback
+  fi
+  if [ "$RB_UNDO" = "0" ]
+    then 
+      echo "Sweeping old undo cache..."
+      rm -rf $BACKUPPATH/rb_undo
+      echo "Done."
+      echo "Writing new undo cache..."
+      mkdir -p $BACKUPPATH/rb_undo
+      rsync -ahu $SERVERPATH/ $BACKUPPATH/rb_undo
+      echo "Done."
+  fi
+  if [ "$USE_RAMFS" = "yes" ]
+    then
+      echo "Sweeping RAMFS..."
+      cd $RAMPATH
+      rm -rf *
+      echo "Done."
+  fi
+  echo "Sweeping server path..."
+  cd $SERVERPATH
+  rm -rf *
+  echo "Done."
+  echo "$RB_MSG3"
+  rsync -ahu $ROLLBACK_FROM/ $SERVERPATH
+  echo "Done. Beginning launch procedure..."
+  mc_upramfs
+  mc_start
+  echo "$RB_MSG4"
+  echo "You may need to update the binaries with buildin update command."
+}
+
+# Displays the available rollback commands
+mc_rbhelp() {
+  echo "Command syntax:" 
+  echo "’rollback dir <directory>’"
+  echo "   Use named directory as new server"
+  echo "’rollback last <number>’"
+  echo "   Rolls back <number> of backups to use as new server (default is 1)"
+  echo "’rollback sel’"
+  echo "   Lets you select the backup from $BACKUPPATH to roll back to"
+  echo "’rollback undo’"
+  echo "   Undoes the last rollback"
+  echo "’rollback help’"
+  echo "   Displays this help"
+}
+
+mc_cgadm() {
+  case $1 in
+    add)
+      if [ "$2" = "" ]
+        then
+          echo "Provide new CommandGrid file:"
+          read FILENAME
+        else FILENAME="$2"
+      fi
+      if [ -f $FILENAME -a ! "$FILENAME" = "$CMDGRID_PATH/`basename $FILENAME`" ]
+        then mv "$FILENAME" "$CMDGRID_PATH/`basename $FILENAME`"
+      fi
+      FILENAME=`basename $FILENAME`
+      if [ ! -f "$CMDGRID_PATH/$FILENAME" ]
+        then 
+          echo "Can't find the file! Aborting..."
+          exit 1
+      fi
+      if grep ":$FILENAME:" "$CONFIG_PATH/$CMDGRID_CONF" > /dev/null
+        then 
+          echo "File already installed."
+          exit 0
+      fi
+      cd $CONFIG_PATH
+      su $CG_USERNAME -c "sudo chown root:root $FILENAME && sudo chmod 644 $FILENAME && echo \"echo :$FILENAME: >> $CONFIG_PATH/$CMDGRID_CONF\" | sudo bash"
+      ;;
+    autoconfig)
+      TEMPPATH="/dev/shm/cg_autoconfig"
+      mkdir $TEMPPATH
+      cd $TEMPPATH
+      ls -1 $CMDGRID_PATH > cglist.tmp
+      while read LINE
+        do
+          echo ":$LINE:" >> cgconf.tmp
+        done < cmdgrid.list
+      echo "#!/bin/bash
+      cd $CMDGRID_PATH
+      while read LINE
+        do
+          sudo chown root:root \$LINE
+          sudo chmod 644 \$LINE
+        done < $TEMPPATH/cglist.tmp
+      sudo chown root:root $TEMPPATH/cgconf.tmp
+      sudo chmod 644 $TEMPPATH/cgconf.tmp
+      sudo mv $TEMPPATH/cgconf.tmp $CONFIG_PATH/$CMDGRID_CONF
+      sudo rm -rf $TEMPPATH 
+      exit 0" > doit.sh
+      chmod a+x doit.sh
+      cd
+      su $CG_USERNAME -c $TEMPPATH/doit.sh
+      ;;
+    list)
+      grep ":" $CONFIG_PATH/$CMDGRID_CONF | cut -d ":" -f 2 | more
+      ;;
+    remove)
+      FILENAME="$2"
+      if [ "$FILENAME" = "" ]
+        then
+          echo "No file specified. Aborting..."
+          exit 1
+      fi
+      if ! grep ":$FILENAME:" "$CONFIG_PATH/$CMDGRID_CONF" > /dev/null
+        then
+          echo "No such file. Aborting..."
+          exit 1
+      fi
+      echo "File will be deleted. Continue? (y/n)"
+      read CHOICE
+      if [ "$CHOICE" = "y" -o "$CHOICE" = "Y" ]
+        then
+          cd $CONFIG_PATH
+          su $CG_USERNAME -c "sudo rm -f $CMDGRID_PATH/$FILENAME && echo \"grep -v :$FILENAME: $CMDGRID_CONF > $CMDGRID_CONF\" | sudo bash"
+        else
+          echo "Aborting..."
+      fi
+      ;;
+    *)
+      echo "Available CommandGrid admin commands are:"
+      echo "* add         Adds a CommandGrid file to the commands list and directory"
+      echo "* autoconfig  Add all files in CommandGrid directory and remove missing"
+      echo "* list        List all installed commands"
+      echo "* remove      Remove a CommandGrid file from commands list and directory"
+      ;;
+  esac
+}
+# =================================== MAIN ====================================
+# This is what will be processed during script invocation, since the modules 
+# are only processed if called by the sections below.
+
+# Check for RAMFS
+if [ "$USE_RAMFS" = "yes" ]
+  then
+    RAMPATH="/dev/shm/$USE_RAMDIR"
+    MCPATH="$RAMPATH"
+  else MCPATH="$SERVERPATH"
+fi
+
+case "$1" in
+  start)
+    mc_head
+    mc_check
+    if [ "$CHECK" ]
+      then
+        echo "$INITNAME is already started."
+        exit 1
+      else
+        echo "Starting $INITNAME..."
+        mc_upramfs
+        mc_start
+    fi
+    ;;
+  stop)
+    mc_critcheck
+    mc_stop
+    mc_saveback
+    ;;
+  restart)
+    mc_critcheck
+    mc_stop
+    mc_saveback
+    mc_start
+    ;;
+  update)
+    mc_head
+    mc_scriptupdate
+    ;;
+  binupdate)
+    mc_head
+    mc_binupdate
+    ;;
+  save)
+    mc_critcheck
+    if [ "$USE_RAMFS" = "yes" ]
+      then
+        mc_saveoff
+        mc_saveback
+        mc_saveon
+      else 
+        echo "This option is only available for RAMFS server mode!"
+        exit 1
+    fi
+    ;;
+  backup)
+    mc_head
+    mc_check
+    if [ "$CHECK" ]
+      then
+        mc_saveoff
+        mc_saveback
+        mc_backup
+        mc_saveon
+      else mc_backup
+    fi
+    ;;
+  rollback)
+    mc_head
+    case $2 in
+      dir)
+        mc_rbdir "$3"
+        mc_rollback
+        ;;
+      last)
+        mc_rblast "$3"
+        mc_rollback
+        ;;
+      sel)
+        mc_rbsel
+        mc_rollback
+        ;;
+      undo)
+        mc_rbundo
+        mc_rollback
+        ;;
+      *)
+        mc_rbhelp
+        ;;
+    esac
+    ;;
+  status)
+    mc_check
+    if [ "$CHECK" ]
+    then
+      echo "$INITNAME is started."
+    else
+      echo "$INITNAME is not running."
+    fi
+    ;;
+  do)
+    mc_critcheck
+    shift
+    if [ "$*" = "" ]
+      then
+        echo "What should I do? Make you a sandwich? Go to bed? Since you don't seem to know, 
+I do exactly what you requested:
+I will do NOTHING!
+Hope you like that."
+        exit 1
+    fi
+    mc_do "$*"
+    mc_feedback
+    ;;
+  cronbackup)
+    CRON="1"
+    mc_backup
+    ;;
+  cronsave)
+    CRON="1"
+    mc_critcheck
+    mc_saveoff
+    mc_saveback
+    mc_saveon
+    ;;
+  cronlog)
+    CRON="1"
+    mc_critcheck
+    mc_newlog
+    mc_clearlog
+    ;;
+  newserver)
+    shift
+    NEW_SERVER="$1"
+    mc_installer
+    ;;
+  cg)
+    shift
+    CG_CMD="$1"
+    shift
+    if grep ":$CG_CMD:" "$CMDGRID_CONF" > /dev/null
+      then
+        source "$CMDGRID_PATH/$CG_CMD"
+      else
+        echo "Unknown CommandGrid command."
+    fi
+    ;;
+  cgadm)
+    echo "Provide sudoer for CommandGrid administration:"
+    read CG_USERNAME
+    shift
+    mc_cgadm
+    ;;
+  *)
+    mc_head
+    echo "Available commands are:"
+    echo "* start       Starts the server"
+    echo "* stop        Stops the server"
+    echo "* restart     Restarts the server"
+    echo "* update      Updates server binary and script files (root access needed!)"
+    echo "* binupdate   Updates only the server binary (no root access needed)"
+    echo "* save        Saves everything to disk"
+    echo "* backup      Backups the server into the defined directory"
+    echo "* rollback    Rolls back to a previous backup"
+    echo "* status      Checks the server status (up/down)"
+    echo "* do          Executes a command directly from the console"
+    echo "* cg          Executes a CommandGrid command."
+    ;;
+esac
+
+exit 0

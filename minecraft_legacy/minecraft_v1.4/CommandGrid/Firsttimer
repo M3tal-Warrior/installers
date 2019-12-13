@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# CommandGrid module 'firsttimer'
+# This module can be run every once per interval to determine if one of the
+# users who's joined within the interval is new to the server. Afterwards you 
+# can add commands to be run, like setting a pattern of permissions, giving him
+# a starter set and so on.
+
+PIPE="list"
+mcc_pipe
+grep "$MCNOW" server.log 

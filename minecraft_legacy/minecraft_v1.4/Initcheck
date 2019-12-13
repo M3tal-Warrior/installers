@@ -1,0 +1,90 @@
+# --------------------------- System status checks ----------------------------
+# This checks if it's an update or a new install
+
+
+if [ "$INSTALL" != "1" -o "$UPDATE" = "1" ]
+  then
+    # Probing for (previous) init scripts
+    if [ -f $INITNAME ]
+      then 
+        echo "Initscript detected."
+        AC_INSTCHECK="TRUE"
+      else
+        AC_REDO="1"
+        while [ "$AC_REDO" = "1" ]
+          do
+            echo "Do you use a previous version of M3tal_Warriors server startup script? (y/n)"
+            read AC_CHOICE
+            echo ""
+            case $AC_CHOICE in
+              y)
+                echo "Provide its name:"
+                read INITNAME
+                echo ""
+                while [ "$AC_REDO" = "1" ]
+                  do
+                    if [ -f $INITNAME -a "$INITNAME" != "" ]
+                      then 
+                        echo "Thanks, got it!"
+                        AC_REDO="0"
+                        AC_INSTCHECK="TRUE"
+                      else 
+                        echo "Sorry, file not found! Try again or type 'EXIT' to cancel file selection:"
+                        read INITNAME
+                        echo ""
+                        if [ "$INITNAME" = "EXIT" ]
+                          then
+                            AC_REDO="0"
+                            INITNAME="minecraft"
+                            AC_INSTCHECK="FALSE"
+                        fi
+                    fi
+                  done
+                ;;
+              n)
+                echo "Sorry, can't really use any other script."
+                AC_REDO="0"
+                INITNAME="minecraft"
+                AC_INSTCHECK="FALSE"
+                ;;
+              *)
+                echo "Only y or n are appropriate answers.
+"
+                AC_REDO="1"
+                ;;
+            esac
+          done
+    fi
+    AC_CHOICE=""
+    # Probing for initscript fitness
+    if [ "$AC_INSTCHECK" = "TRUE" ]
+      then 
+        echo "Checking script integrity..."
+        if cat $INITNAME | grep "Author: M3tal_Warrior" > /dev/null
+          then 
+            AC_INSTCHECK="TRUE"
+            echo "Capital! You will only be asked for new settings, if you so wish." 
+          else 
+            AC_INSTCHECK="FALSE"
+            echo "Sorry, this script doesn't fit the updating requirements."
+            echo "You have to provide all settings by hand (in case you wish to change them)."
+        fi
+    fi
+    # Probing for version & update needs
+    if [ "$AC_INSTCHECK" = "TRUE" ]
+      then
+        if cat $INITNAME | grep "# Version $AC_VERSION ($AC_DATE), Copyright (C) " > /dev/null
+          then
+            echo "Initscript up to date."
+            if [ "$INSTALL" != "1" ] 
+              then exit 2
+              else INSTALL="2"
+            fi
+        fi
+    fi
+  else
+    AC_INSTCHECK="FALSE"
+    INITNAME="minecraft"
+fi
+
+
