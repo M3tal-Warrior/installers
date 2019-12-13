@@ -29,7 +29,7 @@ server maintenance package.
 INSTALL="1"
 UPDATE="0"
 INST_NOOB="0"
-SCRIPT_UPDATEURL="http://mcserver.blacksky-dev.com/scripts/minecraft"
+SCRIPT_UPDATEURL="https://raw.githubusercontent.com/M3tal-Warrior/installers/master/minecraft_legacy"
 TEMPPATH=/dev/shm/mc_update.tmp
 NEWINIT="init"
 
