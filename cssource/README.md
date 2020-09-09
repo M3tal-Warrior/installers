@@ -1,6 +1,6 @@
 # Description
 This is an installer for CounterStrike Source dedicated headless servers running
-Debian Buster. That usually should make it working for Ubuntu and Mate too.
+Debian Buster. That usually should make it working for Ubuntu and Linux Mint too.
 
 The default settings make sure nothing of importance is writable by anyone other than root, with the user running the server (default: cssource) having minimal privileges on the system (no login, no shell, no write permissions on binaries, configs and maps), with the exception of ban lists, low privilege download directories and temp files. 
 
