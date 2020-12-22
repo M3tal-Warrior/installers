@@ -8,7 +8,7 @@
 
 
 # ================================= Copyright =================================
-# Version 0.2.0 (2020-12-21), Copyright (C) 2019-2020
+# Version 0.2.1 (2020-12-22), Copyright (C) 2019-2020
 # Author: Metal_Warrior
 # Coauthors: -
 
@@ -185,6 +185,9 @@ mkdir -p "$CI_INSTALLDIR"
 
 # Reset HOME to push .steam to the home directory of the user
 HOME="$CI_HOME"
+# We need to reset all files to root too, otherwise steamcmd will bail out when
+# using the script to update the server
+chown -R "root:root" "$CI_HOME"
 # Get CS:S
 echo "Downloading CS:S..."
 sleep 1
@@ -311,7 +314,7 @@ mkdir -p "$CI_INSTALLDIR/maps"
 
 # Give the user permissions on its whole home directory, since we created a lot 
 # of files as root there
-chown -R "$CI_USER" "$CI_HOME"
+chown -R "$CI_USER:nogroup" "$CI_HOME"
 
 # Tell the user
 clear
@@ -373,6 +376,7 @@ if [ "$CI_DLCFG" = "y" ]
         echo "server.cfg template could not be downloaded, aborting..."
         exit 1
     fi
+fi
 
 # Ask if there's a wish to edit the file
 echo -e "\nIt is advised to edit the config personally for further options.\nDo that now? (Y/n)"
@@ -403,6 +407,7 @@ while [ -f "/etc/systemd/system/$CI_UNITNAME" ]
         fi
     fi
   done
+CI_SERVICENAME="${CI_UNITNAME:0:-8}"
 # Download
 if wget -q https://raw.githubusercontent.com/M3tal-Warrior/installers/master/cssource/systemd_unit.template -O /etc/systemd/system/$CI_UNITNAME
   then
@@ -411,6 +416,7 @@ if wget -q https://raw.githubusercontent.com/M3tal-Warrior/installers/master/css
     sed -i "s#CI_HOME#$CI_HOME#g" "/etc/systemd/system/$CI_UNITNAME"
     sed -i "s#CI_INSTALLDIR#$CI_INSTALLDIR#g" "/etc/systemd/system/$CI_UNITNAME"
     sed -i "s#CI_TMPDIR#$CI_TMPDIR#g" "/etc/systemd/system/$CI_UNITNAME"
+    sed -i "s#CI_SERVICENAME#$CI_SERVICENAME#g" "/etc/systemd/system/$CI_UNITNAME"
     sed -i "s#CI_USER#$CI_USER#g" "/etc/systemd/system/$CI_UNITNAME"
     # Enable the service
     systemctl daemon-reload

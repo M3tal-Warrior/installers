@@ -14,6 +14,7 @@ PermissionsStartOnly=true
 ExecStart=CI_INSTALLDIR/srcds_linux -game cstrike -console -port 27015 +ip 0.0.0.0 +maxplayers 20 +map cs_havana
 User=CI_USER
 WorkingDirectory=CI_HOME
+SyslogIdentifier=CI_SERVICENAME
 
 Restart=always
 StartLimitBurst=3
