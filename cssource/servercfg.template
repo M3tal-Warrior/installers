@@ -12,8 +12,8 @@ sv_password "CI_LOGINPASSWD"  // Server Login Password. (""=No password)
 //FastDL ;
 //sv_allowupload "1"        //"0" to denied, to upload player custom sprays etc.
 //sv_allowdownload "0"      //"0" denied the direct download from the server
-//sv_loadingurl "http://yourdomain.com/"
-//net_maxfilesize 128
+//sv_downloadurl "https://yourdomain.com/"
+//net_maxfilesize 64        // 64 is max
  
 rcon_password "CI_ADMINPASSWD"  // RCON password
 //sv_rcon_maxfailures 10
@@ -114,6 +114,7 @@ host_framerate 0
 writeid                     // Banned players will be logged in: "banned_user.cfg".
 writeip                     // Banned IPs will be loggeg in: "banned_ip.cfg".
 log on                      // Log
+//logaddress_add IP PORT    // Logging address for hlstatsx; use external IP!
 //sv_aim 0                  // Auto aim. (1=on 0=off)
 //sv_cheats 0               //
 //sv_pausable 0             //

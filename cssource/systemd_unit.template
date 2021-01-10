@@ -18,7 +18,7 @@ SyslogIdentifier=CI_SERVICENAME
 
 Restart=always
 StartLimitBurst=3
-StartLimitBurstInterval=30
+StartLimitInterval=30
 
 [Install]
 WantedBy=multi-user.target
