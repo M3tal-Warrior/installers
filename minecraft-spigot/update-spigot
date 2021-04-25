@@ -1,0 +1,113 @@
+#!/bin/bash
+
+# update-spigot
+# Updates minecraft by downloading the newest spigot server builder, executes
+# that and replaces the minecraft server file with the new one (and restarting
+# the minecraft service)
+
+# ================================= Copyright =================================
+# Version 0.1 (2021-04-25), Copyright (C) 2021
+# Author: Jo Drexl (metal_warrior@metal-warrior.eu)
+
+#   This file is part of Metal_Warriors installer git repository
+
+#   This program is free software: you can redistribute it and/or modify it 
+#   under the terms of the GNU General Public License as published by the 
+#   Free Software Foundation, either version 3 of the License, or any later 
+#   version.
+#   This Program is distributed in the hope that it will be useful, but 
+#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+#   or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+#   for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#   See <http://www.gnu.org/licenses/> for the licence text.
+
+
+# ================================= Variables =================================
+# Temp directory
+US_TEMPDIR="/tmp/update-spigot"
+
+# Spigot buildtool download URL
+US_URL="https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"
+
+# Minecraft binary (target) directory
+US_BINDIR="/usr/local/bin"
+# Minecraft binary name
+US_BINNAME="minecraft-server.jar"
+
+# Systemd service unit
+US_UNIT="minecraft.service"
+
+
+# ================================= Functions =================================
+
+# =============================== Prerequisites ===============================
+
+# We're setting the path variable anew because some systems have that wrong
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Check if being root
+if [ "$(whoami)" != "root" ]
+  then
+    echo "You must execute this script as root."
+    exit 1
+fi
+
+# Prepare environment
+rm -rf "$US_TEMPDIR"
+mkdir -p "$US_TEMPDIR"
+cd "$US_TEMPDIR"
+chown nobody "$US_TEMPDIR"
+
+
+# =================================== Main ====================================
+
+# Get the buildtool
+echo "Downloading build tool..."
+sudo -u nobody wget "$US_URL"
+# Building spigot minecraft server jar (VARIABLES have to be set for maven to 
+# barf its bullshit into the directory, as the fuckin cheap excuse of a bad
+# compiler is not able to just litter the CWD - and as this is just one more
+# reason to distrust this shit, we use nobody to compile the stuff and keep
+# the system otherwise clean)
+sudo -u nobody HOME="$US_TEMPDIR" XDG_CONFIG_HOME="$US_TEMPDIR" _JAVA_OPTIONS="-Duser.home='$US_TEMPDIR'" java -jar "$(basename "$US_URL")"
+
+# Get the only file for which we did all that maven crap
+US_NEWFILE="$US_TEMPDIR/$(ls -1 *.jar | grep spigot)"
+if [ ! -f "$US_NEWFILE"]
+  then
+    echo "No new file was being found! Please investigate '$US_TEMPDIR'!"
+    exit 1
+fi
+# Check for old file
+US_OLDFILE="$US_BINDIR/$US_BINNAME"
+if [ -f "$US_OLDFILE" ]
+  then
+    # Do a diff. If both files are identical, we don't need to restart the
+    # minecraft server and can end here
+    if diff "$US_OLDFILE" "$US_NEWFILE"
+      then
+        echo "Server already up to date."
+        rm -rf "$US_TEMPDIR"
+        exit 0
+    fi
+fi
+
+# Update the server binary
+chown root:root "$US_NEWFILE"
+mv "$US_OLDFILE" "/tmp/$(basename "$US_OLDFILE").old"
+mv "$US_NEWFILE" "$US_OLDFILE"
+echo "Server binary was updated, the old binary was moved to /tmp just in case."
+
+# Restart the minecraft server
+echo "Restarting the minecraft server..."
+systemctl restart "$US_UNIT"
+
+# Cleanup
+rm -rf "$US_TEMPDIR"
+echo "Done."
+
+# This movie is over
+exit 0
