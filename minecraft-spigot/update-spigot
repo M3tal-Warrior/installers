@@ -6,8 +6,8 @@
 # the minecraft service)
 
 # ================================= Copyright =================================
-# Version 0.1 (2021-04-25), Copyright (C) 2021
-# Author: Jo Drexl (metal_warrior@metal-warrior.eu)
+# Version 0.1.1 (2021-05-09), Copyright (C) 2021
+# Author: Metal_Warrior (metal_warrior@metal-warrior.eu)
 
 #   This file is part of Metal_Warriors installer git repository
 
@@ -76,7 +76,7 @@ sudo -u nobody HOME="$US_TEMPDIR" XDG_CONFIG_HOME="$US_TEMPDIR" _JAVA_OPTIONS="-
 
 # Get the only file for which we did all that maven crap
 US_NEWFILE="$US_TEMPDIR/$(ls -1 *.jar | grep spigot)"
-if [ ! -f "$US_NEWFILE"]
+if [ ! -f "$US_NEWFILE" ]
   then
     echo "No new file was being found! Please investigate '$US_TEMPDIR'!"
     exit 1
@@ -97,7 +97,10 @@ fi
 
 # Update the server binary
 chown root:root "$US_NEWFILE"
-mv "$US_OLDFILE" "/tmp/$(basename "$US_OLDFILE").old"
+if [ -f "$US_OLDFILE" ]
+  then
+    mv "$US_OLDFILE" "/tmp/$(basename "$US_OLDFILE").old"
+fi
 mv "$US_NEWFILE" "$US_OLDFILE"
 echo "Server binary was updated, the old binary was moved to /tmp just in case."
 
