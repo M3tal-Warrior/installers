@@ -8,7 +8,7 @@
 
 
 # ================================= Copyright =================================
-# Version 0.2.1 (2020-12-22), Copyright (C) 2019-2020
+# Version 0.2.2 (2022-03-13), Copyright (C) 2019-2022
 # Author: Metal_Warrior
 # Coauthors: -
 
@@ -27,6 +27,11 @@
 #   On Debian systems, the full text of the GNU General Public License
 #   version 3 can be found in the file 
 #     `/usr/share/common-licenses/GPL-3'
+
+
+# ============================= Special Thanks to =============================
+# Bug reporters:
+#   - ornago
 
 
 # ================================= Variables =================================
@@ -96,8 +101,15 @@ sleep 1
 # Add 32 bit architecture, which is necessary for Steam
 dpkg --add-architecture i386
 
-# Add contrib and non-free to all standard repos
-sed -i 's# main# main contrib non-free#g' /etc/apt/sources.list
+# Add contrib and non-free to all standard repos, if not already there
+if ! grep "contrib" /etc/apt/sources.list >/dev/null 2>&1
+  then
+    sed -i 's# main# main contrib#g' /etc/apt/sources.list
+fi
+if ! grep "non-free" /etc/apt/sources.list >/dev/null 2>&1
+  then
+    sed -i 's# contrib# contrib non-free#g' /etc/apt/sources.list
+fi
 
 # Update and upgrade all packages
 apt-get update -qq && apt-get dselect-upgrade
@@ -183,15 +195,14 @@ CI_INSTALLDIR=${CI_INSTALLDIR:-$CI_INSTALLDIR_DEFAULT}
 # Create directory in case it contains nonexisting parents
 mkdir -p "$CI_INSTALLDIR"
 
-# Reset HOME to push .steam to the home directory of the user
-HOME="$CI_HOME"
-# We need to reset all files to root too, otherwise steamcmd will bail out when
+# We need to reset all files to nobody, otherwise steamcmd will bail out when
 # using the script to update the server
-chown -R "root:root" "$CI_HOME"
+chown -R "nobody:nogroup" "$CI_HOME"
+chown -R "nobody:nogroup" "$CI_INSTALLDIR"
 # Get CS:S
 echo "Downloading CS:S..."
 sleep 1
-if ! /usr/games/steamcmd +login anonymous +force_install_dir "$CI_INSTALLDIR" +app_update 232330 validate +quit
+if ! sudo -u nobody HOME="$CI_HOME" /usr/games/steamcmd +force_install_dir "$CI_INSTALLDIR" +login anonymous +app_update 232330 validate +quit
   then
     echo "Steamcmd exited with code $? - we abort here!"
     exit 1
@@ -201,6 +212,9 @@ fi
 
 # Tell the user
 echo "Correcting wrong permissions..."
+
+# Give the install dir to root again
+chown -R "root:root" "$CI_INSTALLDIR"
 
 # Correct all file modes
 find "$CI_HOME" -type f -exec chmod a-x {} \;
