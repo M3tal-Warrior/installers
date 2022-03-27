@@ -171,12 +171,12 @@ ci_setvars
 echo -e "\nChange the users writable directory (default: $CI_HOME_DEFAULT)"
 read CI_HOME
 CI_HOME="${CI_HOME:-$CI_HOME_DEFAULT}"
-# Create directory in case it contains nonexisting parents
-mkdir -p "$CI_HOME"
+# Create home and steam directory in case it contains nonexisting parents
+mkdir -p "$CI_HOME/.steam"
 # Don't attempt to create the user if it's already existing
 if [ "$CI_SKIP_CREATE_USER" != "y" ]
   then
-    if ! adduser --system "$CI_USER" --home "$CI_HOME" 2>/dev/null
+    if ! adduser --system "$CI_USER" --no-create-home --home "$CI_HOME" 2>/dev/null
       then
         echo "User could not be created. Continue anyway? (y/N)"
         read RESPONSE
